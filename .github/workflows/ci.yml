@@ -1,0 +1,30 @@
+name: MaintAI CI
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            client/package-lock.json
+            server/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install web dependencies
+        run: npm run install:all
+      - name: Build web applications
+        run: npm run build
+      - name: Test API
+        run: npm test
+      - name: Install and test AI service
+        run: |
+          pip install -r ai-service/requirements.txt
+          pytest ai-service -q

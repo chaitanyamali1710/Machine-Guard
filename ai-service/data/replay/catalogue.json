@@ -1,0 +1,44 @@
+{
+  "samplingRate": 12000.0,
+  "windowSize": 2048,
+  "heldOutLoadHp": 3,
+  "note": "All windows come from a motor load excluded from the served model's training set.",
+  "scenarios": [
+    {
+      "id": "healthy",
+      "windows": 40,
+      "trueLabel": "normal",
+      "recording": "100.mat",
+      "defectSizeIn": 0.0
+    },
+    {
+      "id": "inner_race_fault",
+      "windows": 40,
+      "trueLabel": "inner_race",
+      "recording": "212.mat",
+      "defectSizeIn": 0.021
+    },
+    {
+      "id": "ball_fault",
+      "windows": 40,
+      "trueLabel": "ball",
+      "recording": "225.mat",
+      "defectSizeIn": 0.021
+    },
+    {
+      "id": "outer_race_fault",
+      "windows": 40,
+      "trueLabel": "outer_race",
+      "recording": "237.mat",
+      "defectSizeIn": 0.021
+    },
+    {
+      "id": "degradation",
+      "windows": 40,
+      "trueLabel": "mixed",
+      "faultStartsAt": 20,
+      "recording": "100.mat -> 212.mat",
+      "defectSizeIn": 0.021
+    }
+  ]
+}

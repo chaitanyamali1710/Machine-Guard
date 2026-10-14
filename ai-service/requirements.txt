@@ -1,0 +1,14 @@
+fastapi==0.115.12
+uvicorn[standard]==0.34.2
+pydantic==2.11.4
+scikit-learn==1.6.1
+numpy==2.2.5
+# scipy and joblib arrive with scikit-learn, but are imported directly (loadmat, model
+# load/save), so they are pinned rather than relied on as transitive dependencies.
+# Python 3.11-compatible SciPy release.
+scipy==1.15.3
+joblib==1.6.0
+openai==1.78.1
+python-dotenv==1.1.0
+pytest==8.3.5
+httpx==0.28.1

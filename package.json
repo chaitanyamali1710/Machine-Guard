@@ -1,0 +1,16 @@
+{
+  "name": "machineguard-ops",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "install:all": "npm install --prefix client && npm install --prefix server",
+    "dev": "concurrently -n CLIENT,SERVER,AI -c cyan,green,magenta \"npm run dev --prefix client\" \"npm run dev --prefix server\" \"npm run dev:ai\"",
+    "dev:ai": "node scripts/run-ai.mjs",
+    "build": "npm run build --prefix client && npm run build --prefix server",
+    "test": "npm run test --prefix server",
+    "zip": "bash scripts/package.sh"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

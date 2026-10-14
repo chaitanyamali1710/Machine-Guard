@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.env
+.venv/
+__pycache__/
+.pytest_cache/
+coverage/
+*.log
+*.zip
+.DS_Store
+
+# Downloaded CWRU recordings and the feature cache: ~134 MB, reproducible via
+# ai-service/training/download.py. The trained model in ai-service/models/ is NOT ignored,
+# because the Render free tier cannot train and loads the committed artifact at startup.
+ai-service/data/raw/
+ai-service/data/processed/
+

@@ -1,0 +1,106 @@
+{
+  "model": "bearing_rf_v1",
+  "created": "2026-10-02T09:36:14.640940+00:00",
+  "input_version": 2,
+  "feature_names": [
+    "rms",
+    "peak",
+    "peak_to_peak",
+    "mean_abs",
+    "std",
+    "skewness",
+    "kurtosis",
+    "crest_factor",
+    "shape_factor",
+    "impulse_factor",
+    "clearance_factor",
+    "spectral_centroid",
+    "spectral_spread",
+    "band_0_energy",
+    "band_1_energy",
+    "band_2_energy",
+    "band_3_energy",
+    "band_4_energy",
+    "band_5_energy",
+    "band_6_energy",
+    "band_7_energy",
+    "band_0_ratio",
+    "band_1_ratio",
+    "band_2_ratio",
+    "band_3_ratio",
+    "band_4_ratio",
+    "band_5_ratio",
+    "band_6_ratio",
+    "band_7_ratio"
+  ],
+  "classes": [
+    "ball",
+    "inner_race",
+    "normal",
+    "outer_race"
+  ],
+  "dataset": {
+    "source": "CWRU Bearing Data Center, 12k drive-end",
+    "windows": 5886,
+    "recordings": 40,
+    "sampling_rate_hz": 12000,
+    "window_size": 2048,
+    "overlap": 0.5,
+    "training_windows": 4352,
+    "replay_holdout_load_hp": 3
+  },
+  "evaluation": {
+    "random_split_leaky": 1.0,
+    "grouped_by_recording": 0.991,
+    "leave_one_load_out": 0.9937,
+    "leave_one_load_out_std": 0.0102,
+    "missed_fault_rate": 0.0,
+    "false_alarm_rate": 0.0,
+    "threshold_baseline": 0.9804,
+    "headline_metric": "leave_one_load_out",
+    "cross_severity": {
+      "held_out_0.007in": 0.7469,
+      "held_out_0.014in": 0.5016,
+      "held_out_0.021in": 0.6373
+    }
+  },
+  "known_limitations": [
+    "Fault detection (fault vs normal) is near-trivial on CWRU: a single amplitude threshold matches the model, so the value is in classification, not detection.",
+    "Classification degrades to roughly 0.50-0.75 on a defect size absent from training. Training data must span the severity range you expect to see.",
+    "CWRU faults are machined by EDM and are cleaner than natural spalling, so these figures are an optimistic estimate of real-world performance."
+  ],
+  "top_features": [
+    {
+      "name": "band_7_energy",
+      "importance": 0.1398
+    },
+    {
+      "name": "band_5_energy",
+      "importance": 0.1242
+    },
+    {
+      "name": "band_3_ratio",
+      "importance": 0.0906
+    },
+    {
+      "name": "band_4_ratio",
+      "importance": 0.0727
+    },
+    {
+      "name": "band_3_energy",
+      "importance": 0.0714
+    },
+    {
+      "name": "spectral_centroid",
+      "importance": 0.0651
+    },
+    {
+      "name": "band_6_energy",
+      "importance": 0.0598
+    },
+    {
+      "name": "band_4_energy",
+      "importance": 0.0579
+    }
+  ]
+}

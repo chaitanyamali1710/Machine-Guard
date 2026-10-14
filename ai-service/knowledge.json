@@ -1,0 +1,26 @@
+[
+  {
+    "id": "vacuum-pump-bearing",
+    "title": "Vacuum Pump Manual — Bearing and Vibration",
+    "section": "Section 6.2",
+    "content": "High vibration together with rising temperature can indicate bearing wear, insufficient lubrication, shaft misalignment, loosened mounting bolts or rotor imbalance. Inspect mounting, lubrication condition and bearing noise before restarting. Isolate electrical power and release stored pressure before inspection."
+  },
+  {
+    "id": "compressor-temperature",
+    "title": "Air Compressor Service Guide — Overheating",
+    "section": "Section 4.7",
+    "content": "Compressor overheating may result from restricted airflow, low lubricant level, contaminated oil, cooler blockage or excessive discharge pressure. Verify ventilation and oil level first. Do not open pressurised components until isolation and depressurisation are confirmed."
+  },
+  {
+    "id": "vibration-severity",
+    "title": "Plant Maintenance Standard — Vibration Response",
+    "section": "Procedure PM-12",
+    "content": "A sustained increase above the equipment baseline requires inspection. Readings above 6.5 millimetres per second are treated as high priority in this demonstration. Compare drive-end and non-drive-end measurements, inspect the foundation and review recent maintenance before replacing components."
+  },
+  {
+    "id": "work-order-safety",
+    "title": "Maintenance Safety Procedure — Lockout and Verification",
+    "section": "Procedure SAFE-03",
+    "content": "Before physical maintenance, create a work order, identify energy sources, perform lockout-tagout, verify zero energy and record the responsible technician. AI recommendations are decision support and must be confirmed by a qualified engineer."
+  }
+]

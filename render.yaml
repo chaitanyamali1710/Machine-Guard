@@ -1,0 +1,50 @@
+services:
+  - type: web
+    name: machineguard-api
+    runtime: node
+    rootDir: server
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: MONGODB_URI
+        sync: false
+      - key: AI_SERVICE_URL
+        fromService:
+          name: machineguard-ai
+          type: web
+          property: host
+      - key: CLIENT_URL
+        sync: false
+      # Keeps reading volume inside the Atlas free tier; see SETUP_KEYS.md section 10.
+      - key: PERSIST_INTERVAL_MS
+        value: "30000"
+      - key: READING_TTL_DAYS
+        value: "7"
+
+  - type: web
+    name: machineguard-ai
+    runtime: python
+    rootDir: ai-service
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      # Render defaults to a newer interpreter, which has no wheels for the pinned scipy and
+      # scikit-learn versions and fails the build. Keep this in step with requirements.txt.
+      - key: PYTHON_VERSION
+        value: "3.11"
+      # Optional. Without a key the copilot still answers from local evidence retrieval.
+      # Any OpenAI-compatible provider works; the default base URL targets Google Gemini.
+      - key: LLM_API_KEY
+        sync: false
+      - key: LLM_BASE_URL
+        value: https://generativelanguage.googleapis.com/v1beta/openai/
+      # Confirm the current model name in your provider's console before deploying.
+      - key: LLM_MODEL
+        value: gemini-3.8-flash
+
