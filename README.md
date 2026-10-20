@@ -60,6 +60,12 @@ docker compose up --build
 
 Then open `http://localhost:5173`.
 
+## Free-tier deployment
+
+For Firebase Hosting (Spark) with free Render API/AI services and MongoDB Atlas M0, see
+[docs/FIREBASE_DEPLOYMENT.md](docs/FIREBASE_DEPLOYMENT.md). No Google Cloud billing account
+is required for this setup.
+
 ## Configuration
 
 Each service has its own empty environment template:

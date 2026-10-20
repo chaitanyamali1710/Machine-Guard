@@ -11,8 +11,9 @@ import type { AuthUser, Role } from './types.js';
 
 const BCRYPT_ROUNDS = 10;
 
-export const DEFAULT_EMAIL = 'admin@maintai.dev';
-export const DEFAULT_PASSWORD = 'Admin@123';
+export const DEFAULT_EMAIL = (process.env.ADMIN_EMAIL || 'admin@maintai.dev').trim().toLowerCase();
+export const DEFAULT_PASSWORD = process.env.ADMIN_PASSWORD || 'Admin@123';
+const DEFAULT_NAME = process.env.ADMIN_NAME || 'Chaitanya Mali';
 
 interface StoredUser { id:string; name:string; email:string; passwordHash:string; role:Role; isDefaultPassword:boolean; }
 
@@ -21,7 +22,7 @@ let memoryUser: StoredUser | null = null;
 
 async function seedMemory(): Promise<StoredUser> {
   memoryUser ??= {
-    id: 'USR-001', name: 'Chaitanya Mali', email: DEFAULT_EMAIL,
+    id: 'USR-001', name: DEFAULT_NAME, email: DEFAULT_EMAIL,
     passwordHash: await bcrypt.hash(DEFAULT_PASSWORD, BCRYPT_ROUNDS),
     role: 'admin', isDefaultPassword: true
   };
@@ -33,7 +34,7 @@ export async function seedAdmin(): Promise<void> {
   if (!isDbReady()) { await seedMemory(); return; }
   if (await UserModel.countDocuments() > 0) return;
   await UserModel.create({
-    name: 'Chaitanya Mali', email: DEFAULT_EMAIL,
+    name: DEFAULT_NAME, email: DEFAULT_EMAIL,
     passwordHash: await bcrypt.hash(DEFAULT_PASSWORD, BCRYPT_ROUNDS),
     role: 'admin', isDefaultPassword: true
   });

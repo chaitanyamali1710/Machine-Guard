@@ -11,12 +11,18 @@ import { restatus, tick } from './store.js';
 
 const port=Number(process.env.PORT||5000);
 
-if(process.env.NODE_ENV==='production'&&!process.env.JWT_SECRET){
-  console.error('JWT_SECRET must be set in production. Refusing to start with the development fallback.');
+const productionRequired=['JWT_SECRET','AI_SERVICE_URL','AI_SERVICE_TOKEN','ADMIN_PASSWORD','MONGODB_URI'];
+const missingProductionConfig=productionRequired.filter(key=>!process.env[key]);
+if(process.env.NODE_ENV==='production'&&missingProductionConfig.length){
+  console.error(`Required production configuration is missing: ${missingProductionConfig.join(', ')}.`);
   process.exit(1);
 }
 
-await connectDb();
+const dbConnected=await connectDb();
+if(process.env.NODE_ENV==='production'&&!dbConnected){
+  console.error('MongoDB must be reachable in production; refusing to start with temporary in-memory data.');
+  process.exit(1);
+}
 await seed();
 await seedAdmin();
 await loadSettings();

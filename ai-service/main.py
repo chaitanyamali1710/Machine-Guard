@@ -1,4 +1,5 @@
 import json
+import hmac
 import os
 from pathlib import Path
 from typing import Optional
@@ -6,6 +7,7 @@ from typing import Optional
 import numpy as np
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -15,8 +17,21 @@ from preprocessing import FEATURE_NAMES, MODEL_INPUT_VERSION, extract_features, 
 
 load_dotenv(Path(__file__).parent / ".env")
 
+if os.getenv("NODE_ENV") == "production" and not os.getenv("INTERNAL_API_TOKEN"):
+    raise RuntimeError("INTERNAL_API_TOKEN must be set in production.")
+
 app = FastAPI(title="MachineGuard Intelligence Service", version="1.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173"], allow_methods=["*"] , allow_headers=["*"])
+
+@app.middleware("http")
+async def require_internal_api_token(request, call_next):
+    if request.url.path != "/health":
+        token = os.getenv("INTERNAL_API_TOKEN")
+        if token and not hmac.compare_digest(
+            request.headers.get("x-machineguard-service-token", ""), token
+        ):
+            return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+    return await call_next(request)
 
 knowledge = json.loads((Path(__file__).parent / "knowledge.json").read_text(encoding="utf-8"))
 

@@ -244,184 +244,34 @@ git push -u origin main
 
 Replace `YOUR_USERNAME`. The ZIP contains no configured repository or remote.
 
-## 9. Deploy FastAPI manually on Render
+## 9. Deploy the free-tier setup
 
-Create the AI service before Express because Express needs its URL.
+For the current no-billing option, deploy Render's two free backend services from the
+Blueprint in `render.yaml`, then deploy the frontend to Firebase Hosting Spark. Follow
+[docs/FIREBASE_DEPLOYMENT.md](docs/FIREBASE_DEPLOYMENT.md); it includes the required
+production secrets, service token, CORS origins and Firebase command.
 
-1. Visit `https://dashboard.render.com` and sign in to your account.
-2. Select **New â†’ Web Service**.
-3. Connect GitHub when requested and select your `machineguard-ops` repository.
-4. Configure:
+The API requires a reachable MongoDB URI and refuses to start in production without it.
+Render free services may sleep while idle, and telemetry/analytics held in memory reset
+when a service restarts. Firebase Hosting Spark has monthly quotas; exceeding them disables
+the site until the next period rather than automatically billing.
 
-```text
-Name: machineguard-ai
-Language/Runtime: Python 3
-Branch: main
-Root Directory: ai-service
-Build Command: pip install -r requirements.txt
-Start Command: uvicorn main:app --host 0.0.0.0 --port $PORT
-Health Check Path: /health
-```
-
-5. Under **Environment**, add the LLM variables **only if** you created a key in section 4:
-
-```text
-LLM_API_KEY=YOUR_KEY
-LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/
-LLM_MODEL=YOUR_CONFIRMED_MODEL_NAME
-```
-
-6. Confirm `ai-service/models/` and `ai-service/data/replay/` are committed. Render's free
-   tier cannot train a model or hold the 134 MB dataset, so it loads these artifacts at
-   startup. Without them `/classify` and `/replay` return 503 while the rest still works.
-7. Create the service and wait for a successful deployment.
-8. Copy your URL, similar to `https://machineguard-ai-XXXX.onrender.com`.
-9. Test `https://YOUR-AI-URL/health`.
-
-These commands match Render's [FastAPI deployment guidance](https://render.com/docs/deploy-fastapi). No Render service or URL is supplied in the project.
-
-## 10. Deploy Express manually on Render
-
-1. Select **New â†’ Web Service** again.
-2. Select the same GitHub repository.
-3. Configure:
-
-```text
-Name: machineguard-api
-Language/Runtime: Node
-Branch: main
-Root Directory: server
-Build Command: npm install && npm run build
-Start Command: npm start
-Health Check Path: /api/health
-```
-
-4. Add these values under **Environment**:
-
-```text
-NODE_ENV=production
-JWT_SECRET=YOUR_GENERATED_JWT_SECRET
-MONGODB_URI=YOUR_COMPLETE_ATLAS_URI
-AI_SERVICE_URL=https://YOUR-AI-SERVICE.onrender.com
-CLIENT_URL=http://localhost:5173
-SENSOR_INTERVAL_MS=4000
-PERSIST_INTERVAL_MS=30000
-READING_TTL_DAYS=7
-```
-
-`JWT_SECRET` is mandatory in production: with `NODE_ENV=production` the server refuses to
-start without it, rather than silently signing tokens with the development fallback that is
-visible in the public repository.
-
-`PERSIST_INTERVAL_MS` and `READING_TTL_DAYS` protect the Atlas free tier. Readings are written
-every 30 seconds rather than every tick, and expire after 7 days, which holds storage at
-roughly 35 MB instead of growing past the 512 MB limit in about two weeks. Lowering the
-interval or raising the TTL will fill a free cluster.
-
-Changing `READING_TTL_DAYS` later requires dropping the existing TTL index by hand; Mongoose
-will not alter an index that already exists.
-
-5. Create and deploy the service.
-6. Copy your API URL, similar to `https://machineguard-api-XXXX.onrender.com`.
-7. Test `https://YOUR-API-URL/api/health`.
-
-Render supports custom Express build/start commands through a connected repository. See the [official Express deployment guide](https://render.com/docs/deploy-node-express-app). Environment values are entered in the individual service dashboard and are applied after saving and redeploying.
-
-### Atlas access from Render
-
-If Atlas blocks Render, configure Atlas Network Access using the approach supported by your Render plan. A broad `0.0.0.0/0` entry permits connection attempts from anywhere and is not ideal for production. Prefer fixed outbound addresses or private networking when available, and always use strong least-privilege database credentials.
-
-## 11. Choose one frontend host
-
-Use Vercel or Firebase Hosting. You do not need both.
-
-### Option A â€” Vercel
-
-1. Visit `https://vercel.com` and sign in.
-2. Select **Add New â†’ Project**.
-3. Import your `machineguard-ops` GitHub repository.
-4. Set the framework to Vite if it is not detected.
-5. Set **Root Directory** to `client`.
-6. Use:
-
-```text
-Build Command: npm run build
-Output Directory: dist
-Install Command: npm install
-```
-
-7. Add this Environment Variable:
-
-```text
-VITE_API_URL=https://YOUR-RENDER-API.onrender.com/api
-```
-
-8. Deploy and copy your Vercel URL.
-9. Open the Render `machineguard-api` service.
-10. Replace `CLIENT_URL` with the exact Vercel URL and redeploy Express.
-
-Vite browser variables on Vercel require the `VITE_` prefix. Environment changes affect new deployments, so redeploy after changing a value. See [Vite on Vercel](https://vercel.com/docs/frameworks/frontend/vite).
-
-### Option B â€” Firebase Hosting
-
-Firebase is not the database for this project. Use it only for frontend hosting or optional future Firebase features.
-
-1. Visit `https://console.firebase.google.com` using your Google account.
-2. Select **Add project**, name it `machineguard-ops`, and finish creation.
-3. In Project Overview, select the Web icon `</>`.
-4. Enter `MachineGuard Web` and register the application.
-5. Firebase displays a `firebaseConfig` object containing `apiKey`, `authDomain`, `projectId`, `storageBucket`, `messagingSenderId` and `appId`.
-6. Copy matching values into `client/.env` only if you integrate Firebase features:
-
-```env
-VITE_FIREBASE_API_KEY=YOUR_VALUE
-VITE_FIREBASE_AUTH_DOMAIN=YOUR_VALUE
-VITE_FIREBASE_PROJECT_ID=YOUR_VALUE
-VITE_FIREBASE_STORAGE_BUCKET=YOUR_VALUE
-VITE_FIREBASE_MESSAGING_SENDER_ID=YOUR_VALUE
-VITE_FIREBASE_APP_ID=YOUR_VALUE
-VITE_API_URL=https://YOUR-RENDER-API.onrender.com/api
-```
-
-Firebase provides this config object when you register a web app. See the [official Firebase web setup](https://firebase.google.com/docs/web/setup).
-
-7. Install and authenticate the CLI:
-
-```powershell
-npm install -g firebase-tools
-firebase login
-firebase use --add
-```
-
-8. Select the Firebase project you created.
-9. Let `firebase use --add` create the local project mapping, or copy `.firebaserc.example` to `.firebaserc` and replace its placeholder with your project ID.
-10. Build and deploy:
-
-```powershell
-npm run build --prefix client
-firebase deploy --only hosting
-```
-
-11. Copy your generated Firebase Hosting URL.
-12. Set Render's `CLIENT_URL` to that exact URL and redeploy Express.
-
-## 12. Final ownership and security check
+## 10. Final ownership and security check
 
 Confirm all of the following:
 
-- MongoDB Atlas project is owned by your account.
-- Database user and password were created by you.
-- `MONGODB_URI` exists only in `server/.env` and Render's Express environment.
-- The LLM key exists only in `ai-service/.env` and Render's AI environment.
-- JWT secret was generated by you, and `JWT_SECRET` is set in Render's Express environment.
+- MongoDB Atlas project and database user belong to your account.
+- `MONGODB_URI` exists only in Render's API-service environment or a private local `.env`.
+- `ADMIN_PASSWORD` is unique and has been changed after first login.
+- The same private random token is configured as API `AI_SERVICE_TOKEN` and AI
+  `INTERNAL_API_TOKEN`.
+- JWT and service tokens are stored only in private provider environment settings.
+- The LLM key, if used, is stored only in the AI service's private environment.
 - `ai-service/models/` and `ai-service/data/replay/` are committed; `ai-service/data/raw/` is not.
-- GitHub repository belongs to your account.
-- Render services belong to your account.
-- Vercel or Firebase project belongs to your account.
-- No `.env` file appears in `git status` or GitHub.
-- No `YOUR_...` or `PASTE_...` placeholder remains in a deployed environment.
-- `CLIENT_URL` is the exact frontend origin with no path after the domain.
-- `VITE_API_URL` ends with `/api`.
-- Local and hosted health endpoints respond successfully.
+- No `.env` file or secret appears in GitHub.
+- `CLIENT_URL` contains only the exact Firebase/custom HTTPS origins, with no path.
+- The client build uses the Render API URL ending in `/api`.
+- Both hosted health endpoints respond successfully.
 
-The included `render.yaml`, `firebase.json` and `vercel.json` are generic templates. They contain no account ID, service ID, project ID, deployment URL or credential. You may ignore them and follow the manual dashboard steps above.
+The free-tier configuration uses Firebase Hosting and Render, not Cloud Run. Cloud Run is
+optional and requires a Google Cloud billing account.

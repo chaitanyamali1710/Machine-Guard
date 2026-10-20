@@ -20,3 +20,14 @@ def test_retrieval_answer_has_sources():
     response = client.post("/ask", json={"question":"Why does a vacuum pump vibrate?", "telemetry":sample()})
     assert response.status_code == 200
     assert len(response.json()["sources"]) > 0
+
+def test_internal_routes_require_service_token(monkeypatch):
+    monkeypatch.setenv("INTERNAL_API_TOKEN", "test-token")
+    denied = client.post("/analyze", json=sample())
+    allowed = client.post(
+        "/analyze",
+        json=sample(),
+        headers={"x-machineguard-service-token": "test-token"},
+    )
+    assert denied.status_code == 401
+    assert allowed.status_code == 200
