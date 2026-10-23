@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { seedAdmin } from './accounts.js';
+import { seedAdmin, seedDemoAccount } from './accounts.js';
 import { app } from './app.js';
 import { connectDb } from './db.js';
 import { ReadingModel } from './models.js';
@@ -25,6 +25,7 @@ if(process.env.NODE_ENV==='production'&&!dbConnected){
 }
 await seed();
 await seedAdmin();
+await seedDemoAccount();
 await loadSettings();
 
 // The simulator runs fast so the dashboard feels live; persistence is slower to stay inside

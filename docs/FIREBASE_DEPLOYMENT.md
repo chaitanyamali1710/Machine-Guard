@@ -54,8 +54,8 @@ In Render, create a **Blueprint** from the GitHub repository and select the root
 
 When prompted for environment values:
 
-1. Enter an administrator password of 8–72 characters for `ADMIN_PASSWORD` and save it. Use
-   it with `ADMIN_EMAIL` (`admin@maintai.dev`) on first login, then change it in the app.
+1. Enter a private administrator password of 8–72 characters for `ADMIN_PASSWORD` and save
+   it securely. Do not share or put it on the login page.
 2. Generate one random token locally, for example:
 
    ```powershell
@@ -101,7 +101,9 @@ the domain with Firebase Hosting before deploying.
 
 ## After deployment
 
-- Sign in with the admin email/password you configured in Render.
+- The login page displays the public, read-only evaluator account:
+  `demo@maintai.dev` / `Demo@12345`.
+- Keep the admin account (`admin@maintai.dev`) and its private password to yourself.
 - Confirm the dashboard loads, then try the AI question feature. The first request after
   idle may be slow because the free backend services wake up.
 - Keep the project on Spark / free service plans to avoid charges. Monitor free-tier usage.

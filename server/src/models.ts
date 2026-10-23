@@ -4,9 +4,9 @@ import mongoose, { Schema } from 'mongoose';
 // record. A TTL index keeps the Atlas free tier (512 MB) from filling up over time.
 const READING_TTL_DAYS = Number(process.env.READING_TTL_DAYS || 7);
 
-// isDefaultPassword lets the login screen stop advertising the shipped demo credentials once
-// the administrator has set a real password.
-const userSchema = new Schema({ name:String, email:{type:String,unique:true,index:true}, passwordHash:String, role:{type:String,default:'viewer'}, isDefaultPassword:{type:Boolean,default:false} }, {timestamps:true});
+// isDefaultPassword identifies the local starter admin account; the public evaluator account
+// is stored separately and marked with isDemo.
+const userSchema = new Schema({ name:String, email:{type:String,unique:true,index:true}, passwordHash:String, role:{type:String,default:'viewer'}, isDefaultPassword:{type:Boolean,default:false}, isDemo:{type:Boolean,default:false} }, {timestamps:true});
 const machineSchema = new Schema({ id:{type:String,unique:true,index:true}, name:String, type:String, location:String, status:String, health:Number, nextMaintenance:Date, reading:{type:Schema.Types.Mixed} }, {timestamps:true});
 // No field-level `index: true` here. Declaring one on `timestamp` as well as the TTL index
 // below makes Mongoose treat them as duplicates and silently drop `expireAfterSeconds`, so

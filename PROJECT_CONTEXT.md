@@ -199,7 +199,7 @@ read-modify-write.**
 ### Added during development
 | Feature | Notes |
 |---|---|
-| **Real accounts** | Credentials in MongoDB, changeable email + password, survives restart. Login page stops advertising demo credentials once changed |
+| **Accounts** | Admin credentials are private and persisted in MongoDB. A separate shared evaluator account is public and read-only. |
 | **Two settings panels** | System (plant-wide, admin-only: facility name, risk thresholds, intervals, retention, energy tariff) and Account (personal) |
 | **Reliability** | OEE (A × P × Q), MTBF, MTTR, per-asset breakdown |
 | **Performance** | Energy (kWh, cost, per-asset baseline deviation, kWh/unit), multi-signal trends, period comparison |
@@ -232,7 +232,8 @@ The rename from MaintAI → MachineGuard protected three identifiers. **Do not "
 | Identifier | Why |
 |---|---|
 | `maintai` MongoDB database name | Renaming orphans all existing data |
-| `admin@maintai.dev` | A real row in that database; editable from the Account panel |
+| `admin@maintai.dev` | Private administrator row in the database; editable from the Account panel |
+| `demo@maintai.dev` | Public read-only evaluator account; seeded separately and displayed on the login page |
 | `maintai_token` / `maintai_user` localStorage keys | Renaming silently signs every user out |
 
 ---

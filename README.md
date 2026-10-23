@@ -43,14 +43,15 @@ pip install -r ai-service/requirements.txt
 npm run dev
 ```
 
-Open `http://localhost:5173` and sign in with:
+Open `http://localhost:5173` and use the read-only evaluator account:
 
 ```text
-Email: admin@maintai.dev
-Password: Admin@123
+Login ID: demo@maintai.dev
+Password: Demo@12345
 ```
 
-No MongoDB or LLM key is required for demo mode.
+The admin account is separate and should never use the public evaluator password. No MongoDB
+or LLM key is required for local demo mode.
 
 ## Docker start
 

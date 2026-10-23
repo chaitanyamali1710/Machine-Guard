@@ -66,12 +66,22 @@ function Login({ onLogin }: { onLogin: () => void }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  // Only prefill and advertise the starter credentials while they are genuinely unchanged.
-  const [showDemo, setShowDemo] = useState(false);
+  const [demoCredentials, setDemoCredentials] = useState<{email:string;password:string}|null>(null);
+  const [demoUnavailable, setDemoUnavailable] = useState(false);
 
-  useEffect(()=>{ api.get('/auth/default-credentials')
-    .then(r=>{ if(r.data.usingDefaults){ setShowDemo(true); setEmail('admin@maintai.dev'); setPassword('Admin@123'); } })
-    .catch(()=>{}); },[]);
+  useEffect(()=>{
+    let active=true;
+    api.get<{enabled:boolean;email:string;password:string}>('/auth/demo-credentials')
+      .then(({data})=>{
+        if(!active||!data.enabled)return;
+        const credentials={email:data.email,password:data.password};
+        setDemoCredentials(credentials);
+        setEmail(value=>value||credentials.email);
+        setPassword(value=>value||credentials.password);
+      })
+      .catch(()=>{if(active)setDemoUnavailable(true);});
+    return()=>{active=false;};
+  },[]);
 
   async function submit(e: FormEvent) {
     e.preventDefault(); setBusy(true); setError('');
@@ -110,7 +120,8 @@ function Login({ onLogin }: { onLogin: () => void }) {
         <label>Password<input value={password} onChange={e => setPassword(e.target.value)} type="password" required/></label>
         {error && <div className="form-error">{error}</div>}
         <button className="primary-btn" disabled={busy}>{busy ? 'Signing in…' : <>Sign in <ChevronRight size={18}/></>}</button>
-        {showDemo&&<div className="demo-note"><ShieldCheck size={16}/><span>Demo: admin@maintai.dev / Admin@123</span></div>}
+        {demoCredentials&&<div className="demo-note"><ShieldCheck size={16}/><div><strong>Public evaluator account · read-only</strong><span>Login ID: <code>{demoCredentials.email}</code></span><span>Password: <code>{demoCredentials.password}</code></span></div></div>}
+        {demoUnavailable&&<div className="demo-note" role="status">Demo credentials are temporarily unavailable. Please refresh and try again.</div>}
       </form>
     </div>
   </div>;
@@ -132,9 +143,9 @@ function MachineTable({ machines, onSelect }: { machines: Machine[], onSelect: (
 
 type DrawerTab = 'telemetry' | 'diagnosis' | 'maintenance';
 
-function MachineDrawer({ machine, alerts, orders, close, onCreated, onOpenOrder }:
+function MachineDrawer({ machine, alerts, orders, close, onCreated, onOpenOrder, canManage }:
     { machine: Machine | null; alerts: Alert[]; orders: WorkOrder[];
-      close: () => void; onCreated: () => void; onOpenOrder: (id: string) => void }) {
+      close: () => void; onCreated: () => void; onOpenOrder: (id: string) => void; canManage: boolean }) {
   const [tab, setTab] = useState<DrawerTab>('telemetry');
   const [diagnosis, setDiagnosis] = useState<AiDiagnosis|null>(null);
   const [diagBusy, setDiagBusy] = useState(false);
@@ -225,9 +236,9 @@ function MachineDrawer({ machine, alerts, orders, close, onCreated, onOpenOrder 
               <em> · {o.status} · {o.assignedTo}</em>
             </li>)}</ul>}
 
-      {!creating
+      {canManage&&!creating
         ? <button className="primary-btn" onClick={()=>setCreating(true)}><Wrench size={17}/> Create maintenance order</button>
-        : <form className="drawer-form" onSubmit={createOrder}>
+        : canManage&&creating&&<form className="drawer-form" onSubmit={createOrder}>
             <label>Task<input value={form.title} onChange={e=>setForm({...form,title:e.target.value})} minLength={4} maxLength={160} required autoFocus/></label>
             <label>Priority<select value={form.priority} onChange={e=>setForm({...form,priority:e.target.value})}>
               <option value="low">low</option><option value="medium">medium</option><option value="high">high</option></select></label>
@@ -255,18 +266,18 @@ function MachineDrawer({ machine, alerts, orders, close, onCreated, onOpenOrder 
   </aside></div>;
 }
 
-function AlertsView({ alerts, refresh }: { alerts: Alert[], refresh: () => void }) {
+function AlertsView({ alerts, refresh, canAcknowledge }: { alerts: Alert[], refresh: () => void; canAcknowledge: boolean }) {
   async function acknowledge(id: string) { await api.patch(`/alerts/${id}/acknowledge`); refresh(); }
   return <section className="content-card"><div className="section-head"><div><span className="kicker">RISK CENTER</span><h2>Active alerts</h2></div><span className="count-badge">{alerts.filter(a=>!a.acknowledged).length} open</span></div>
-    <div className="alert-list">{alerts.map(a => <article className={`alert-row severity-${a.severity}`} key={a.id}><span className="alert-icon"><AlertTriangle size={19}/></span><div><strong>{a.title}</strong><p>{a.message}</p><small>{a.machineName} · {new Date(a.createdAt).toLocaleString()}</small></div>{a.acknowledged ? <span className="ack"><CheckCircle2 size={16}/> Acknowledged</span> : <button className="soft-btn" onClick={() => acknowledge(a.id)}>Acknowledge</button>}</article>)}</div>
+    <div className="alert-list">{alerts.map(a => <article className={`alert-row severity-${a.severity}`} key={a.id}><span className="alert-icon"><AlertTriangle size={19}/></span><div><strong>{a.title}</strong><p>{a.message}</p><small>{a.machineName} · {new Date(a.createdAt).toLocaleString()}</small></div>{a.acknowledged ? <span className="ack"><CheckCircle2 size={16}/> Acknowledged</span> : canAcknowledge&&<button className="soft-btn" onClick={() => acknowledge(a.id)}>Acknowledge</button>}</article>)}</div>
   </section>;
 }
 
-function WorkOrdersView({ orders, refresh, onOpen }: { orders: WorkOrder[], refresh: () => void, onOpen: (id: string) => void }) {
+function WorkOrdersView({ orders, refresh, onOpen, canManage }: { orders: WorkOrder[], refresh: () => void, onOpen: (id: string) => void; canManage: boolean }) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ machineId:'VAC-104', title:'Inspect abnormal vibration', priority:'high', assignedTo:'Maintenance Team' });
   async function create(e: FormEvent) { e.preventDefault(); await api.post('/work-orders', form); setOpen(false); refresh(); }
-  return <><section className="content-card"><div className="section-head"><div><span className="kicker">MAINTENANCE</span><h2>Work orders</h2></div><button className="primary-small" onClick={()=>setOpen(true)}><Plus size={16}/> New order</button></div>
+  return <><section className="content-card"><div className="section-head"><div><span className="kicker">MAINTENANCE</span><h2>Work orders</h2></div>{canManage&&<button className="primary-small" onClick={()=>setOpen(true)}><Plus size={16}/> New order</button>}</div>
     <div className="order-grid">{orders.map(o => <article className="order-card order-card-open" key={o.id} role="button" tabIndex={0} aria-label={`Open work order ${o.title}`} onClick={()=>onOpen(o.id)} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();onOpen(o.id);}}}><div><span className={`priority priority-${o.priority}`}>{o.priority}</span><StatusBadge status={o.status}/></div><h3>{o.title}</h3><p>{o.machineName} · {o.machineId}</p><footer><span><Wrench size={15}/>{o.assignedTo}</span><small>Due {new Date(o.dueDate).toLocaleDateString()}</small></footer></article>)}</div></section>
     {open && <div className="modal-backdrop"><form className="modal" onSubmit={create}><div className="section-head"><h2>Create work order</h2><button type="button" className="icon-btn" onClick={()=>setOpen(false)}><X/></button></div><label>Machine ID<input value={form.machineId} onChange={e=>setForm({...form,machineId:e.target.value})}/></label><label>Task<input value={form.title} onChange={e=>setForm({...form,title:e.target.value})}/></label><label>Priority<select value={form.priority} onChange={e=>setForm({...form,priority:e.target.value})}><option>low</option><option>medium</option><option>high</option></select></label><label>Assign to<input value={form.assignedTo} onChange={e=>setForm({...form,assignedTo:e.target.value})}/></label><button className="primary-btn">Create order</button></form></div>}</>;
 }
@@ -424,26 +435,28 @@ function AccountSettingsView({ onSignOut, onProfileChange }: { onSignOut: () => 
       <div><strong>No database connected.</strong>
         <p>Credential changes will be lost when the server restarts. Set MONGODB_URI to store them properly.</p></div></div>}
 
+    {account?.isDemo&&<div className="settings-hint">This is a shared, read-only evaluator account. Its profile and password cannot be changed.</div>}
+
     <div className="settings-grid">
       <section className="content-card">
         <div className="section-head"><div><span className="kicker">SIGN-IN ID</span><h2>Profile</h2></div></div>
-        <form onSubmit={saveProfile}>
+        {!account?.isDemo?<form onSubmit={saveProfile}>
           <label>Full name<input value={name} onChange={e=>setName(e.target.value)} minLength={2} maxLength={80} required/></label>
           <label>Email (this is your login ID)<input type="email" value={email} onChange={e=>setEmail(e.target.value)} required/></label>
           <label>Current password<input type="password" value={profilePassword} onChange={e=>setProfilePassword(e.target.value)} placeholder="Confirm it is you" required/></label>
           <button className="primary-btn" disabled={busy}>Save profile</button>
-        </form>
+        </form>:<p className="settings-hint">The evaluator sign-in ID is shared with other visitors and cannot be edited.</p>}
         <p className="settings-hint">Your role is <b>{account?.role ?? '—'}</b>. Changing the email changes what you type at the login screen.</p>
       </section>
 
       <section className="content-card">
         <div className="section-head"><div><span className="kicker">SECURITY</span><h2>Change password</h2></div></div>
-        <form onSubmit={savePassword}>
+        {!account?.isDemo?<form onSubmit={savePassword}>
           <label>Current password<input type="password" value={current} onChange={e=>setCurrent(e.target.value)} required/></label>
           <label>New password<input type="password" value={next} onChange={e=>setNext(e.target.value)} minLength={8} maxLength={72} required/></label>
           <label>Repeat new password<input type="password" value={confirm} onChange={e=>setConfirm(e.target.value)} minLength={8} maxLength={72} required/></label>
           <button className="primary-btn" disabled={busy}>Change password</button>
-        </form>
+        </form>:<p className="settings-hint">The shared evaluator password cannot be changed.</p>}
         <p className="settings-hint">At least 8 characters. You will be signed out afterwards and must sign in with the new password.</p>
       </section>
     </div>
@@ -945,7 +958,7 @@ function OperationsView() {
   </section>;
 }
 
-function WorkOrderModal({ id, onClose, onChanged }: { id: string; onClose: () => void; onChanged: () => void }) {
+function WorkOrderModal({ id, onClose, onChanged, canManage }: { id: string; onClose: () => void; onChanged: () => void; canManage: boolean }) {
   const [order, setOrder] = useState<WorkOrderDetail|null>(null);
   const [meta, setMeta] = useState<WorkOrderMeta|null>(null);
   const [error, setError] = useState('');
@@ -986,7 +999,7 @@ function WorkOrderModal({ id, onClose, onChanged }: { id: string; onClose: () =>
 
       <div className="wo-status">
         {(['open','in-progress','completed'] as const).map(s=>
-          <button key={s} className={order.status===s?'chip active':'chip'} disabled={busy}
+          <button key={s} className={order.status===s?'chip active':'chip'} disabled={!canManage||busy}
             onClick={()=>call(()=>api.patch(`/work-orders/${id}/status`,{status:s}))}>{s.replace('-',' ')}</button>)}
         <span className="wo-assignee">{order.assignedTo}</span>
       </div>
@@ -995,15 +1008,15 @@ function WorkOrderModal({ id, onClose, onChanged }: { id: string; onClose: () =>
         <h3>Checklist {tasks.length>0 && <small>{doneCount}/{tasks.length} complete</small>}</h3>
         {tasks.length===0
           ? <div className="wo-attach">
-              <select value={template} onChange={e=>setTemplate(e.target.value)} aria-label="Checklist template">
+              <select value={template} disabled={!canManage} onChange={e=>setTemplate(e.target.value)} aria-label="Checklist template">
                 {meta?.checklistTemplates.map(t=><option key={t} value={t}>{t}</option>)}
               </select>
-              <button className="soft-btn" disabled={busy} onClick={()=>call(()=>api.post(`/work-orders/${id}/checklist`,{template}))}>Attach checklist</button>
+              {canManage&&<button className="soft-btn" disabled={busy} onClick={()=>call(()=>api.post(`/work-orders/${id}/checklist`,{template}))}>Attach checklist</button>}
             </div>
           : <ul className="wo-checklist">{tasks.map(t=>
               <li key={t.id}>
                 <label>
-                  <input type="checkbox" checked={t.done} disabled={busy}
+                  <input type="checkbox" checked={t.done} disabled={!canManage||busy}
                     onChange={e=>call(()=>api.patch(`/work-orders/${id}/checklist`,{taskId:t.id,done:e.target.checked}))}/>
                   <span className={t.done?'done':''}>{t.text}</span>
                 </label>
@@ -1014,27 +1027,28 @@ function WorkOrderModal({ id, onClose, onChanged }: { id: string; onClose: () =>
       <div className="wo-section">
         <h3>Cost</h3>
         <div className="wo-cost">
-          <label>Labour hours<input type="number" step="0.25" min="0" value={cost.labourHours} onChange={e=>setCost({...cost,labourHours:e.target.value})}/></label>
-          <label>Rate / hour<input type="number" step="10" min="0" value={cost.labourRate} onChange={e=>setCost({...cost,labourRate:e.target.value})}/></label>
-          <label>Parts cost<input type="number" step="10" min="0" value={cost.partsCost} onChange={e=>setCost({...cost,partsCost:e.target.value})}/></label>
+          <label>Labour hours<input type="number" step="0.25" min="0" value={cost.labourHours} readOnly={!canManage} onChange={e=>setCost({...cost,labourHours:e.target.value})}/></label>
+          <label>Rate / hour<input type="number" step="10" min="0" value={cost.labourRate} readOnly={!canManage} onChange={e=>setCost({...cost,labourRate:e.target.value})}/></label>
+          <label>Parts cost<input type="number" step="10" min="0" value={cost.partsCost} readOnly={!canManage} onChange={e=>setCost({...cost,partsCost:e.target.value})}/></label>
           <div className="wo-total"><span>Total</span><b>₹{total.toLocaleString()}</b></div>
         </div>
-        <button className="soft-btn" disabled={busy} onClick={()=>call(()=>api.patch(`/work-orders/${id}/cost`,{labourHours:Number(cost.labourHours)||0,labourRate:Number(cost.labourRate)||0,partsCost:Number(cost.partsCost)||0}))}>Save cost</button>
+        {canManage&&<button className="soft-btn" disabled={busy} onClick={()=>call(()=>api.patch(`/work-orders/${id}/cost`,{labourHours:Number(cost.labourHours)||0,labourRate:Number(cost.labourRate)||0,partsCost:Number(cost.partsCost)||0}))}>Save cost</button>}
       </div>
 
       <div className="wo-section">
         <h3>Root cause</h3>
         <label>Failure code
-          <select value={cause.failureCode} onChange={e=>setCause({...cause,failureCode:e.target.value})}>
+        <select value={cause.failureCode} disabled={!canManage} onChange={e=>setCause({...cause,failureCode:e.target.value})}>
             <option value="">Select a cause…</option>
             {meta?.failureCodes.map(f=><option key={f.code} value={f.code}>{f.group} — {f.label}</option>)}
           </select></label>
         {cause.whys.map((w,i)=>
-          <label key={i}>Why {i+1}?<input value={w} placeholder={i===0?'Why did it fail?':'And why was that?'}
+          <label key={i}>Why {i+1}?<input value={w} readOnly={!canManage} placeholder={i===0?'Why did it fail?':'And why was that?'}
             onChange={e=>{const next=[...cause.whys];next[i]=e.target.value;setCause({...cause,whys:next});}}/></label>)}
-        <label>Notes<input value={cause.notes} onChange={e=>setCause({...cause,notes:e.target.value})} placeholder="Action to prevent recurrence"/></label>
-        <button className="soft-btn" disabled={busy||!cause.failureCode}
+        <label>Notes<input value={cause.notes} readOnly={!canManage} onChange={e=>setCause({...cause,notes:e.target.value})} placeholder="Action to prevent recurrence"/></label>
+        {canManage&&<button className="soft-btn" disabled={busy||!cause.failureCode}
           onClick={()=>call(()=>api.patch(`/work-orders/${id}/cause`,{failureCode:cause.failureCode,whys:cause.whys,notes:cause.notes}))}>Save cause</button>
+        }
         <p className="settings-hint">A failure code is required before an order can be completed — free text cannot be
           counted, and counted causes are what turn maintenance history into training data.</p>
       </div>
@@ -1250,8 +1264,8 @@ function ReliabilityView() {
   </section>;
 }
 
-function NotificationBell({ alerts, onOpenAlerts, onAcknowledge }:
-    { alerts: Alert[]; onOpenAlerts: () => void; onAcknowledge: (id: string) => void }) {
+function NotificationBell({ alerts, onOpenAlerts, onAcknowledge, canAcknowledge }:
+    { alerts: Alert[]; onOpenAlerts: () => void; onAcknowledge: (id: string) => void; canAcknowledge: boolean }) {
   const [open, setOpen] = useState(false);
   const unread = alerts.filter(a => !a.acknowledged);
 
@@ -1285,9 +1299,9 @@ function NotificationBell({ alerts, onOpenAlerts, onAcknowledge }:
                 <small>{a.machineName} · {ago(a.createdAt)}</small>
                 <p>{a.message}</p>
               </div>
-              <button className="soft-btn" onClick={()=>onAcknowledge(a.id)} title="Acknowledge">
+              {canAcknowledge&&<button className="soft-btn" onClick={()=>onAcknowledge(a.id)} title="Acknowledge">
                 <CheckCircle2 size={14}/>
-              </button>
+              </button>}
             </div>)}
           </div>}
       <button className="bell-foot" onClick={()=>{setOpen(false);onOpenAlerts();}}>
@@ -1388,6 +1402,8 @@ function App() {
   useEffect(()=>{ if(!authenticated)return; load(); loadAccount(); loadSettings(); const id=setInterval(load,5000); return()=>clearInterval(id); },[authenticated]);
   // Tables show every asset; narrowing now happens through the global search instead.
   const filtered = data.machines;
+  const canWrite = ['admin','manager','technician'].includes(account?.role ?? '');
+  const canManageAssets = ['admin','manager'].includes(account?.role ?? '');
   if(!authenticated) return <Login onLogin={()=>setAuthenticated(true)}/>;
 
   function logout(){localStorage.clear();setAuthenticated(false);}
@@ -1396,17 +1412,17 @@ function App() {
   return <div className="app-shell">
     <a className="skip-link" href="#main-content">Skip to main content</a>
     <aside className={`sidebar ${sidebar?'sidebar-open':''}`}><div className="brand"><span className="brand-mark"><Activity size={21}/></span> MachineGuard</div><div className="facility"><span>FACILITY</span><strong>{settings?.facilityName ?? 'Loading…'}</strong><small><i/> Connected</small></div><nav>{nav.map(item=><button className={page===item.id?'active':''} key={item.id} onClick={()=>{setPage(item.id);setSidebar(false)}}><item.icon size={18}/>{item.label}{item.id==='alerts'&&data.metrics.activeAlerts>0?<b>{data.metrics.activeAlerts}</b>:null}</button>)}</nav><div className="sidebar-foot"><button className="profile-chip" onClick={()=>{setPage('account');setSidebar(false)}} title="Open your account settings"><span className="user-avatar">{initials(account?.name)}</span><span><strong>{account?.name ?? 'Loading…'}</strong><small>{roleLabel(account?.role) || 'Account'}</small></span></button><button className="signout-btn" onClick={logout} title="Sign out" aria-label="Sign out"><LogOut size={17}/></button></div></aside>
-    <main><header><button className="menu-btn" onClick={()=>setSidebar(!sidebar)} aria-label="Toggle navigation"><Menu/></button><GlobalSearch data={data} onSelectMachine={setSelected} onNavigate={setPage}/><div className="header-actions"><span className="live"><i aria-hidden="true"/> LIVE</span><NotificationBell alerts={data.alerts} onOpenAlerts={()=>setPage('alerts')} onAcknowledge={acknowledge}/><button className="avatar avatar-btn" onClick={()=>setPage('account')} title={account?`${account.name} — open account settings`:'Account settings'}>{initials(account?.name)}</button></div></header>
+    <main><header><button className="menu-btn" onClick={()=>setSidebar(!sidebar)} aria-label="Toggle navigation"><Menu/></button><GlobalSearch data={data} onSelectMachine={setSelected} onNavigate={setPage}/><div className="header-actions"><span className="live"><i aria-hidden="true"/> LIVE</span><NotificationBell alerts={data.alerts} onOpenAlerts={()=>setPage('alerts')} onAcknowledge={acknowledge} canAcknowledge={canWrite}/><button className="avatar avatar-btn" onClick={()=>setPage('account')} title={account?`${account.name} — open account settings`:'Account settings'}>{initials(account?.name)}</button></div></header>
       <div className="page-content" id="main-content">{error&&<div className="api-banner" role="alert"><AlertTriangle size={17}/>{error}</div>}<p className="sr-only" aria-live="polite">{data.metrics.activeAlerts} active alert{data.metrics.activeAlerts===1?"":"s"} across {data.metrics.totalMachines} assets</p>
       {page==='overview'&&<><div className="page-title"><div><span className="kicker">PLANT OVERVIEW</span><h1>{greeting()}{account?`, ${account.name.split(' ')[0]}`:''}</h1><p>Here is what is happening across your operation.</p></div><div className="updated"><i/>Updated {new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</div></div>
         <div className="metrics"><MetricCard icon={Factory} label="Total assets" value={data.metrics.totalMachines} sub={`${data.metrics.operational} operating normally`} tone="mint"/><MetricCard icon={Activity} label="Average health" value={`${data.metrics.averageHealth}%`} sub="Across monitored equipment" tone="blue"/><MetricCard icon={AlertTriangle} label="Active alerts" value={data.metrics.activeAlerts} sub="Requires attention" tone="orange"/><MetricCard icon={ShieldCheck} label="Avoided downtime" value={`${data.metrics.avoidedDowntimeHours}h`} sub="Estimated this month" tone="purple"/></div>
         <div className="guardrail"><ShieldCheck size={16}/><div><strong>Decision support only</strong><p>All recommendations require verification by a qualified technician.</p></div></div>
         <div className="dashboard-grid"><TemperatureCard machines={data.machines}/><section className="content-card risk-panel"><div className="section-head"><div><span className="kicker">AI RISK WATCH</span><h2>Priority assets</h2></div><Sparkles size={18}/></div>{[...data.machines].sort((a,b)=>b.reading.riskScore-a.reading.riskScore).slice(0,3).map(m=><button className="risk-machine" key={m.id} onClick={()=>setSelected(m)}><span className={`risk-ring ${m.reading.riskScore>65?'high':''}`}>{m.reading.riskScore}</span><div><strong>{m.name}</strong><small>{m.reading.riskScore>65?'Inspection recommended':'Within normal range'}</small></div><ChevronRight size={16}/></button>)}<div className="ai-summary"><Bot/><p><strong>AI summary</strong> Compressor C-12 shows a rising vibration pattern. Check bearing lubrication within 8 hours.</p></div></section></div>
         <FloorMap machines={data.machines} onSelect={setSelected}/><section className="content-card"><div className="section-head"><div><span className="kicker">ASSET FLEET</span><h2>Machine health</h2></div><button className="text-btn" onClick={()=>setPage('machines')}>View all <ChevronRight size={15}/></button></div><MachineTable machines={filtered.slice(0,5)} onSelect={setSelected}/></section></>}
-      {page==='machines'&&<section className="content-card"><div className="section-head"><div><span className="kicker">ASSET MANAGEMENT</span><h2>All machines</h2></div><button className="primary-small" onClick={()=>setRegistering(true)}><Plus size={16}/> Register asset</button></div><MachineTable machines={filtered} onSelect={setSelected}/></section>}
-      {page==='alerts'&&<AlertsView alerts={data.alerts} refresh={load}/>} {page==='work-orders'&&<WorkOrdersView orders={data.workOrders} refresh={load} onOpen={setOpenOrder}/>} {page==='replay'&&<ReplayView/>} {page==='reliability'&&<ReliabilityView/>} {page==='performance'&&<PerformanceView machines={data.machines}/>} {page==='operations'&&<OperationsView/>} {page==='assistant'&&<AssistantView machines={data.machines}/>} {page==='settings'&&<SystemSettingsView isAdmin={account?.role==='admin'} onSaved={loadSettings}/>}
+      {page==='machines'&&<section className="content-card"><div className="section-head"><div><span className="kicker">ASSET MANAGEMENT</span><h2>All machines</h2></div>{canManageAssets&&<button className="primary-small" onClick={()=>setRegistering(true)}><Plus size={16}/> Register asset</button>}</div><MachineTable machines={filtered} onSelect={setSelected}/></section>}
+      {page==='alerts'&&<AlertsView alerts={data.alerts} refresh={load} canAcknowledge={canWrite}/>} {page==='work-orders'&&<WorkOrdersView orders={data.workOrders} refresh={load} onOpen={setOpenOrder} canManage={canWrite}/>} {page==='replay'&&<ReplayView/>} {page==='reliability'&&<ReliabilityView/>} {page==='performance'&&<PerformanceView machines={data.machines}/>} {page==='operations'&&<OperationsView/>} {page==='assistant'&&<AssistantView machines={data.machines}/>} {page==='settings'&&<SystemSettingsView isAdmin={account?.role==='admin'} onSaved={loadSettings}/>}
       {page==='account'&&<AccountSettingsView onSignOut={logout} onProfileChange={loadAccount}/>}
-      </div>{page==='overview'&&<AppFooter/>}</main><MachineDrawer machine={selected} alerts={data.alerts} orders={data.workOrders} close={()=>setSelected(null)} onCreated={load} onOpenOrder={setOpenOrder}/>{registering&&<RegisterAssetModal onClose={()=>setRegistering(false)} onCreated={load}/>}{openOrder&&<WorkOrderModal id={openOrder} onClose={()=>setOpenOrder(null)} onChanged={load}/>}</div>;
+      </div>{page==='overview'&&<AppFooter/>}</main><MachineDrawer machine={selected} alerts={data.alerts} orders={data.workOrders} close={()=>setSelected(null)} onCreated={load} onOpenOrder={setOpenOrder} canManage={canWrite}/>{registering&&<RegisterAssetModal onClose={()=>setRegistering(false)} onCreated={load}/>}{openOrder&&<WorkOrderModal id={openOrder} onClose={()=>setOpenOrder(null)} onChanged={load} canManage={canWrite}/>}</div>;
 }
 
 export default App;

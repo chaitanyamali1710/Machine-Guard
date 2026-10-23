@@ -16,6 +16,13 @@ services:
         value: admin@maintai.dev
       - key: ADMIN_PASSWORD
         sync: false
+      # Intentionally public credentials for the restricted evaluator account.
+      - key: DEMO_LOGIN_ENABLED
+        value: "true"
+      - key: DEMO_EMAIL
+        value: demo@maintai.dev
+      - key: DEMO_PASSWORD
+        value: Demo@12345
       - key: MONGODB_URI
         sync: false
       - key: AI_SERVICE_TOKEN

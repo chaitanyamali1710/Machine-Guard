@@ -6,7 +6,7 @@ import rateLimit from 'express-rate-limit';
 import axios from 'axios';
 import { z } from 'zod';
 import { allow, requireAuth, sign } from './auth.js';
-import { authenticate, changePassword, changeProfile, getAccount, usingDefaultCredentials } from './accounts.js';
+import { authenticate, changePassword, changeProfile, DEMO_EMAIL, DEMO_PASSWORD, getAccount, isDemoLoginEnabled, usingDefaultCredentials } from './accounts.js';
 import { acknowledgeAlert, createWorkOrder, getMachine, getMachines, getAlerts, getWorkOrders, saveMachine } from './repository.js';
 import { MACHINE_TYPES, addMachine, machineExists } from './store.js';
 import { getComparison, getEnergy, getSignals } from './analytics.js';
@@ -43,8 +43,9 @@ app.use('/api/auth',rateLimit({windowMs:15*60*1000,limit:30,standardHeaders:true
 const loginSchema=z.object({email:z.string().email(),password:z.string().min(8).max(72)});
 app.post('/api/auth/login',async(req,res,next)=>{const parsed=loginSchema.safeParse(req.body);if(!parsed.success)return res.status(400).json({message:'Enter a valid email and password'});try{const user=await authenticate(parsed.data.email,parsed.data.password);if(!user)return res.status(401).json({message:'Incorrect email or password'});res.json({token:sign(user),user});}catch(err){next(err);}});
 app.get('/api/health',(_req,res)=>res.json({status:'ok',service:'machineguard-api',timestamp:new Date().toISOString()}));
-// Lets the login screen show the starter credentials only while they are still unchanged.
+// Local-only status for the starter admin; never returns the private admin credentials.
 app.get('/api/auth/default-credentials',async(_req,res,next)=>{try{res.json({usingDefaults:process.env.NODE_ENV!=='production'&&await usingDefaultCredentials()});}catch(err){next(err);}});
+app.get('/api/auth/demo-credentials',(_req,res)=>{if(!isDemoLoginEnabled())return res.json({enabled:false});res.json({enabled:true,email:DEMO_EMAIL,password:DEMO_PASSWORD});});
 
 app.use('/api',requireAuth);
 
@@ -66,12 +67,12 @@ app.patch('/api/settings',allow('admin'),async(req,res,next)=>{const parsed=sett
 // A new password must differ from the current one and is capped at 72 bytes, which is the
 // most bcrypt actually hashes; anything beyond that is silently ignored by the algorithm.
 const passwordSchema=z.object({currentPassword:z.string().min(1).max(72),newPassword:z.string().min(8,'Use at least 8 characters').max(72)}).refine(d=>d.currentPassword!==d.newPassword,{message:'The new password must be different',path:['newPassword']});
-app.patch('/api/account/password',async(req:AuthedRequest,res,next)=>{const parsed=passwordSchema.safeParse(req.body);if(!parsed.success)return res.status(400).json({message:parsed.error.issues[0]?.message||'Invalid password'});try{const r=await changePassword(req.user!.id,parsed.data.currentPassword,parsed.data.newPassword);if(!r.ok)return res.status(r.reason==='wrong-password'?401:404).json({message:r.reason==='wrong-password'?'Current password is incorrect':'Account not found'});
+app.patch('/api/account/password',async(req:AuthedRequest,res,next)=>{const parsed=passwordSchema.safeParse(req.body);if(!parsed.success)return res.status(400).json({message:parsed.error.issues[0]?.message||'Invalid password'});try{const r=await changePassword(req.user!.id,parsed.data.currentPassword,parsed.data.newPassword);if(!r.ok){const status=r.reason==='wrong-password'?401:r.reason==='demo-account'?403:404;return res.status(status).json({message:r.reason==='wrong-password'?'Current password is incorrect':r.reason==='demo-account'?'The shared evaluator account cannot change its password':'Account not found'});}
 // No fresh token is issued: the client signs out so the password change takes effect everywhere.
 res.json({message:'Password updated. Please sign in again.'});}catch(err){next(err);}});
 
 const profileSchema=z.object({currentPassword:z.string().min(1).max(72),email:z.string().email(),name:z.string().min(2).max(80)});
-app.patch('/api/account/profile',async(req:AuthedRequest,res,next)=>{const parsed=profileSchema.safeParse(req.body);if(!parsed.success)return res.status(400).json({message:'Enter a valid name and email'});try{const r=await changeProfile(req.user!.id,parsed.data.currentPassword,parsed.data.email,parsed.data.name);if(!r.ok){const status=r.reason==='wrong-password'?401:r.reason==='email-taken'?409:404;return res.status(status).json({message:r.reason==='wrong-password'?'Current password is incorrect':r.reason==='email-taken'?'That email is already in use':'Account not found'});}
+app.patch('/api/account/profile',async(req:AuthedRequest,res,next)=>{const parsed=profileSchema.safeParse(req.body);if(!parsed.success)return res.status(400).json({message:'Enter a valid name and email'});try{const r=await changeProfile(req.user!.id,parsed.data.currentPassword,parsed.data.email,parsed.data.name);if(!r.ok){const status=r.reason==='wrong-password'?401:r.reason==='email-taken'?409:r.reason==='demo-account'?403:404;return res.status(status).json({message:r.reason==='wrong-password'?'Current password is incorrect':r.reason==='email-taken'?'That email is already in use':r.reason==='demo-account'?'The shared evaluator account cannot change its profile':'Account not found'});}
 // The token embeds the old email, so re-issue it to keep the session consistent.
 res.json({message:'Profile updated',user:r.user,token:sign(r.user)});}catch(err){next(err);}});
 app.get('/api/dashboard',async(_req,res,next)=>{try{const [machines,alerts,workOrders]=await Promise.all([getMachines(),getAlerts(),getWorkOrders()]);const activeAlerts=alerts.filter(a=>!a.acknowledged).length;res.json({machines,alerts,workOrders,metrics:{totalMachines:machines.length,operational:machines.filter(m=>m.status==='healthy').length,activeAlerts,averageHealth:Math.round(machines.reduce((s,m)=>s+m.health,0)/machines.length),avoidedDowntimeHours:37}});}catch(err){next(err);}});
@@ -123,7 +124,7 @@ app.patch('/api/work-orders/:id/cause',crew,async(req,res,next)=>{const p=z.obje
 app.get('/api/analytics/comparison',async(req,res,next)=>{const days=Math.min(7,Math.max(1,Number(req.query.days)||1));try{res.json(await getComparison(days));}catch(err){next(err);}});
 app.post('/api/reliability/reset',allow('admin','manager'),(_req,res)=>{resetReliability();res.json({message:'Measurement window restarted'});});
 app.get('/api/machines/:id',async(req,res,next)=>{try{const m=await getMachine(String(req.params.id));return m?res.json(m):res.status(404).json({message:'Machine not found'});}catch(err){next(err);}});
-app.patch('/api/alerts/:id/acknowledge',async(req,res,next)=>{try{const a=await acknowledgeAlert(String(req.params.id));return a?res.json(a):res.status(404).json({message:'Alert not found'});}catch(err){next(err);}});
+app.patch('/api/alerts/:id/acknowledge',allow('admin','manager','technician'),async(req,res,next)=>{try{const a=await acknowledgeAlert(String(req.params.id));return a?res.json(a):res.status(404).json({message:'Alert not found'});}catch(err){next(err);}});
 const orderSchema=z.object({machineId:z.string().min(2).max(30),title:z.string().min(4).max(160),priority:z.enum(['low','medium','high']),assignedTo:z.string().min(2).max(80)});
 app.post('/api/work-orders',allow('admin','manager','technician'),async(req,res,next)=>{const parsed=orderSchema.safeParse(req.body);if(!parsed.success)return res.status(400).json({message:'Invalid work order',issues:parsed.error.flatten()});try{const m=await getMachine(parsed.data.machineId);const order={id:`WO-${Date.now().toString().slice(-5)}`,machineId:parsed.data.machineId,machineName:m?.name||parsed.data.machineId,title:parsed.data.title,priority:parsed.data.priority,status:'open',assignedTo:parsed.data.assignedTo,dueDate:new Date(Date.now()+2*86400000).toISOString()};await createWorkOrder(order);res.status(201).json(order);}catch(err){next(err);}});
 const aiHeaders=()=>process.env.AI_SERVICE_TOKEN?{'x-machineguard-service-token':process.env.AI_SERVICE_TOKEN}:undefined;

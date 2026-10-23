@@ -661,7 +661,7 @@ Starts all three services. It finds the virtualenv automatically — no activati
 | FastAPI | http://localhost:8000/health |
 | API docs | http://localhost:8000/docs |
 
-**Login:** `admin@maintai.dev` / `Admin@123` (change it in Account settings).
+**Public evaluator login:** `demo@maintai.dev` / `Demo@12345` (read-only).
 
 ### Step 7 — confirm it is working
 - Express logs `MongoDB connected`

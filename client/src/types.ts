@@ -54,6 +54,8 @@ export interface Account {
   isDefaultPassword: boolean;
   /** False when no database is connected, so changes will not survive a restart. */
   persisted: boolean;
+  /** Shared public evaluator account; profile and password changes are disabled. */
+  isDemo?: boolean;
 }
 
 export interface AiDiagnosis {

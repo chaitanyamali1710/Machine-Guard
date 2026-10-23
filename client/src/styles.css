@@ -326,3 +326,4 @@ table.confusion td.hit{background:var(--ok-bg);color:var(--ok-ink)}
 table.confusion td.miss{background:var(--bad-bg);color:var(--bad-ink)}
 table.confusion td.zero{color:#c6cedb}
 @keyframes floorPulse{0%{r:18;opacity:.55}100%{r:34;opacity:0}}
+.demo-note>div{display:flex;flex-direction:column;gap:4px}.demo-note strong{font-size:12px}.demo-note code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px}
