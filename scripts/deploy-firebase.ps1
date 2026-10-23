@@ -12,7 +12,7 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $clientDir = Join-Path $repoRoot 'client'
 
-foreach ($tool in @('firebase', 'npm')) {
+foreach ($tool in @('firebase', 'npm.cmd')) {
   if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) {
     throw "Required command '$tool' was not found. Install Firebase CLI and Node.js first."
   }
@@ -30,12 +30,12 @@ if ($health.status -ne 'ok') {
 Push-Location $repoRoot
 try {
   $env:VITE_API_URL = $ApiUrl
-  & npm ci --prefix $clientDir
+  & npm.cmd ci --prefix $clientDir
   if ($LASTEXITCODE -ne 0) {
     throw "Installing client dependencies failed with exit code $LASTEXITCODE."
   }
 
-  & npm run build --prefix $clientDir
+  & npm.cmd run build --prefix $clientDir
   if ($LASTEXITCODE -ne 0) {
     throw "Building the client failed with exit code $LASTEXITCODE."
   }
